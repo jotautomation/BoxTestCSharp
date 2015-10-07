@@ -123,8 +123,8 @@ namespace BoxTestCSharp
                 {
                     result_post = HandleBoxCmd("get_state", false, boxip, 1);
                     dynamic jss = new JavaScriptSerializer();
-                    dynamic BoxStateObject = jss.Deserialize<BoxStateObject>(result_post);
-                    result_post = HandleBoxCmd("release", true, BoxStateObject.products(0).jlid, boxip, 1);
+                    dynamic BoxState = jss.Deserialize<object>(result_post);
+                    result_post = HandleBoxCmd("release", true, BoxState["products"][0]["jlid"], boxip, 1);
                 }
 
                 Console.WriteLine(result_post);
