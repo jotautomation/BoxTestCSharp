@@ -9,6 +9,10 @@ using System.IO;
 using System.Text;
 using System.Web.Script.Serialization;
 using System.Threading;
+using Nancy;
+using Nancy.Hosting.Self;
+using System.Linq;
+using System.Net.Sockets;
 
 namespace BoxTestCSharp
 {
@@ -18,26 +22,47 @@ namespace BoxTestCSharp
         static void Main(string[] args)
         {
             bool bstop = false;
-            string boxip = "10.186.81.186";
+            string boxip = "62.241.233.94";
+
+            NancyHost MyNancyHost = new NancyHost(new Uri("http://localhost:1234/"));
+            MyNancyHost.Start();
 
             Thread t = new Thread(() =>
             {
+                dynamic result_post = HandleBoxCmd("get_info", false, boxip, 1);
+                JavaScriptSerializer jss = new JavaScriptSerializer();
+                dynamic BoxInfo = jss.Deserialize<object>(result_post);
+
+                Console.WriteLine(BoxInfo["serial_number"]);
+
+                bool subscribed = false;
+               HandleBoxSubscription(BoxInfo["serial_number"], true, boxip, 1);
 
                 while ((!bstop))
                 {
-                    dynamic result_post = HandleBoxCmd("get_state", false, boxip, 1);
+                    if (!subscribed)
+                    {
+                        result_post = HandleBoxCmd("get_state", false, boxip, 1);
 
-                    JavaScriptSerializer jss = new JavaScriptSerializer();
-                    BoxStateObject BoxStateObject = jss.Deserialize<BoxStateObject>(result_post);
-                    Console.WriteLine(BoxStateObject.state);
+                        BoxStateObject BoxStateObject = jss.Deserialize<BoxStateObject>(result_post);
+                        Console.WriteLine(BoxStateObject.state);
 
-                    dynamic BoxState = jss.Deserialize<object>(result_post);
-                    Console.WriteLine(BoxState["state"]);
+                        dynamic BoxState = jss.Deserialize<object>(result_post);
+                        Console.WriteLine(BoxState["state"]);
 
-                    Console.WriteLine(result_post);
+                        Console.WriteLine(result_post);
 
-                    Thread.Sleep(1000);
+
+                        Thread.Sleep(1000);
+                    }
+                    else
+                    {
+                        Thread.Sleep(10);
+                    }
+
                 }
+
+                HandleBoxSubscription(BoxInfo["serial_number"], false, boxip, 1);
 
             });
             t.Start();
@@ -191,6 +216,33 @@ namespace BoxTestCSharp
 
         }
 
+        public static bool HandleBoxSubscription(string boxid, bool subscribe, string boxip, int slidenumber)
+        {
+            string LocalIpAddress = GetLocalIPAddress();
+
+            BoxCommandSubscription thesubscription = new BoxCommandSubscription()
+            {
+                cmd = (subscribe) ? "subscribe" : "unsubscribe",
+                address = string.Format("http://{0}:1234/boxstate/{1}", LocalIpAddress, boxid),
+                error_mode = "ignore"
+            };
+
+            String response = PostCmd(string.Format("http://{0}/slide{1}/command", boxip, slidenumber.ToString()), thesubscription);
+            return (response == "") ? true : false;
+        }
+
+        private static string GetLocalIPAddress()
+        {
+            if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+            {
+                return null;
+            }
+
+            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+
+            return host.AddressList.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork).ToString();
+
+        }
 
         public static string PostCmd(string postDestination, object objectToSend)
         {
@@ -212,7 +264,7 @@ namespace BoxTestCSharp
                 using (var response = (HttpWebResponse)subrequest.GetResponse())
                 {
                     // todo: consider a more lenient check here?
-                    if (response.StatusCode != HttpStatusCode.OK)
+                    if (response.StatusCode != System.Net.HttpStatusCode.OK)
                     {
                         Thread.Sleep(1000);
                     }
@@ -262,6 +314,14 @@ namespace BoxTestCSharp
         {
             public string cmd;
             public ProductInBoxInfo[] products;
+            public string scanner_secret;
+        }
+
+        public struct BoxCommandSubscription
+        {
+            public string cmd;
+            public string address;
+            public string error_mode;
             public string scanner_secret;
         }
     }
