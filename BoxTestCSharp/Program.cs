@@ -13,6 +13,7 @@ using Nancy;
 using Nancy.Hosting.Self;
 using System.Linq;
 using System.Net.Sockets;
+using System.Windows.Forms;
 
 namespace BoxTestCSharp
 {
@@ -22,10 +23,22 @@ namespace BoxTestCSharp
         static void Main(string[] args)
         {
             bool bstop = false;
-            string boxip = "62.241.233.94";
+            string boxip = "62.241.233.94"; // Enter the box IP here
+            // If you are using multiple network connections, please update your own IP address at line 236
 
             NancyHost MyNancyHost = new NancyHost(new Uri("http://localhost:1234/"));
-            MyNancyHost.Start();
+            try
+            {
+                MyNancyHost.Start();
+            }
+            catch (Nancy.Hosting.Self.AutomaticUrlReservationCreationFailureException) 
+            {
+                MessageBox.Show("Please run with Administrator privileges");
+                Environment.Exit(0);
+            }
+            catch (Exception Ex)
+            { throw Ex; }
+
 
             Thread t = new Thread(() =>
             {
@@ -36,8 +49,10 @@ namespace BoxTestCSharp
                 Console.WriteLine(BoxInfo["serial_number"]);
 
                 bool subscribed = false;
-               HandleBoxSubscription(BoxInfo["serial_number"], true, boxip, 1);
+                dynamic subscriptionResult = HandleBoxSubscription(BoxInfo["serial_number"], true, boxip, 1);
+                Console.WriteLine(subscriptionResult);
 
+                /*
                 while ((!bstop))
                 {
                     if (!subscribed)
@@ -61,6 +76,7 @@ namespace BoxTestCSharp
                     }
 
                 }
+                */
 
                 HandleBoxSubscription(BoxInfo["serial_number"], false, boxip, 1);
 
@@ -216,7 +232,7 @@ namespace BoxTestCSharp
 
         }
 
-        public static bool HandleBoxSubscription(string boxid, bool subscribe, string boxip, int slidenumber)
+        public static string HandleBoxSubscription(string boxid, bool subscribe, string boxip, int slidenumber)
         {
             string LocalIpAddress = GetLocalIPAddress();
 
@@ -228,7 +244,8 @@ namespace BoxTestCSharp
             };
 
             String response = PostCmd(string.Format("http://{0}/slide{1}/command", boxip, slidenumber.ToString()), thesubscription);
-            return (response == "") ? true : false;
+            Console.WriteLine("Handled box subscription");
+            return response;
         }
 
         private static string GetLocalIPAddress()
