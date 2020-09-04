@@ -124,7 +124,7 @@ namespace BoxTestCSharp
                     result_post = HandleBoxCmd("get_state", false, boxip, 1);
                     dynamic jss = new JavaScriptSerializer();
                     dynamic BoxState = jss.Deserialize<object>(result_post);
-                    result_post = HandleBoxCmd("release", true, BoxState["products"][0]["jlid"], boxip, 1);
+                    result_post = HandleBoxCmd("release", true, BoxState["products"][0]["jlid"], boxip, 1, BoxState["products"][0]["cid"]);
                 }
 
                 Console.WriteLine(result_post);
@@ -133,12 +133,14 @@ namespace BoxTestCSharp
 
         }
 
-        public static string HandleBoxCmd(string cmd, bool withproduct, string jlid, string boxip, int slidenumber)
+        public static string HandleBoxCmd(string cmd, bool withproduct, string jlid, string boxip, int slidenumber, string cid)
         {
             BoxCommand commandToBeSent = default(BoxCommand);
             Random rnd = new Random();
 
             String thejlid = null;
+            String thecid = null;
+
             if ((!withproduct))
             {
                 thejlid = "";
@@ -153,26 +155,36 @@ namespace BoxTestCSharp
                 {
                     thejlid = jlid;
                 }
+                if ((cid.Equals("")))
+                {
+                    thecid = rnd.Next(1000, 100000).ToString();
+                }
+                else
+                {
+                    thecid = cid;
+                }
             }
 
             ProductInBoxInfo theproduct = new ProductInBoxInfo
             {
                 jlid = thejlid,
+                cid = thecid,
                 test_result = "not_tested"
             };
             commandToBeSent = new BoxCommand
             {
                 cmd = cmd,
-                products = new ProductInBoxInfo[] { theproduct }
+                products = new ProductInBoxInfo[] { theproduct },
+                version = 2
             };
             String response = PostCmd(string.Format("http://{0}/slide{1}/command", boxip, slidenumber.ToString()), commandToBeSent);
             return response;
 
         }
 
-        public static string HandleBoxCmd(string cmd, bool withproduct, string boxip, int slidenumber)
+        public static string HandleBoxCmd(string cmd, bool withproduct, string boxip, int slidenumber, string cid="")
         {
-            return HandleBoxCmd(cmd, withproduct, "", boxip, slidenumber);
+            return HandleBoxCmd(cmd, withproduct, "", boxip, slidenumber, cid);
         }
 
         public static string HandleBoxSetting(string SettingName, bool value, string boxip, int slidenumber)
@@ -256,6 +268,7 @@ namespace BoxTestCSharp
         {
             public string jlid;
             public string test_result;
+            public string cid;
         }
 
         public struct BoxCommand
@@ -263,6 +276,7 @@ namespace BoxTestCSharp
             public string cmd;
             public ProductInBoxInfo[] products;
             public string scanner_secret;
+            public int version;
         }
     }
 }
